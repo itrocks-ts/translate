@@ -1,0 +1,48 @@
+{
+	"author": {
+		"name": "Baptiste Pillot",
+		"email": "baptiste@pillot.fr"
+	},
+	"dependencies": {
+		"papaparse": "^5.4"
+	},
+	"description": "",
+	"devDependencies": {
+		"@types/node": "^22.10",
+		"typescript": "~5.6"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"exports": {
+		"import": "./esm/translate.js",
+		"require": "./cjs/translate.js"
+	},
+	"files": [
+		"LICENSE",
+		"README.md",
+		"*/*.d.ts",
+		"*/*.js",
+		"!*/esm.*"
+	],
+	"homepage": "https://it.rocks",
+	"keywords": [
+		"backend",
+		"it.rocks",
+		"translate",
+		"translation"
+	],
+	"license": "LGPL-3.0-or-later",
+	"name": "@itrocks/translate",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/itrocks-ts/translate.git"
+	},
+	"scripts": {
+		"build": "npm run build:cjs && npm run build:esm",
+		"build:cjs": "tsc -p tsconfig.cjs.json",
+		"build:esm": "tsc -p tsconfig.esm.json && node esm/esm"
+	},
+	"types": "esm/translate.js",
+	"version": "0.0.1"
+}
