@@ -6,7 +6,7 @@
 	"dependencies": {
 		"papaparse": "^5.4"
 	},
-	"description": "",
+	"description": "Manage dynamic string translations with support for variables and composite patterns",
 	"devDependencies": {
 		"@types/node": "^22.10",
 		"typescript": "~5.6"
@@ -28,9 +28,14 @@
 	"homepage": "https://it.rocks",
 	"keywords": [
 		"backend",
+		"composite",
+		"i18n",
+		"internationalization",
 		"it.rocks",
+		"localization",
 		"translate",
-		"translation"
+		"translation",
+		"variable"
 	],
 	"license": "LGPL-3.0-or-later",
 	"name": "@itrocks/translate",
@@ -44,5 +49,5 @@
 		"build:esm": "tsc -p tsconfig.esm.json && node esm/esm"
 	},
 	"types": "esm/translate.js",
-	"version": "0.0.1"
+	"version": "0.0.2"
 }
