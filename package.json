@@ -9,6 +9,7 @@
 	"description": "Manage dynamic string translations with support for variables and composite patterns",
 	"devDependencies": {
 		"@types/node": "^22.10",
+		"@types/papaparse": "^5.3",
 		"typescript": "~5.6"
 	},
 	"engines": {
@@ -49,5 +50,5 @@
 		"build:esm": "tsc -p tsconfig.esm.json && node esm/esm"
 	},
 	"types": "esm/translate.js",
-	"version": "0.0.3"
+	"version": "0.0.4"
 }
