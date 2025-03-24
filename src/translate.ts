@@ -20,10 +20,9 @@ export type Options = {
 	ucFirst?: boolean
 }
 
-export { tr }
-export default function tr(text: string, options: Options): string
-export default function tr(text: string, parts?: string[], options?: Options): string
-export default function tr(text: string, parts?: string[] | Options, options?: Options): string
+export function tr(text: string, options: Options): string
+export function tr(text: string, parts?: string[], options?: Options): string
+export function tr(text: string, parts?: string[] | Options, options?: Options): string
 {
 	if (!parts) {
 		parts = []
