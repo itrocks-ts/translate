@@ -1,3 +1,4 @@
+import { access }   from 'node:fs/promises'
 import { readFile } from 'node:fs/promises'
 
 const parseCsv = require('papaparse').parse
@@ -57,12 +58,18 @@ export function tr(text: string, parts?: string[] | Options, options?: Options):
 	return firstSpaces + translated + lastSpaces
 }
 
-export function trInit(lang: string, file: string)
+export function trInit(lang: string)
 {
 	language = lang
 	expressions.clear()
 	translations.clear()
-	readFile(file, 'utf-8')
+}
+
+export async function trLoad(file: string)
+{
+	try { await access(file) }
+	catch { return }
+	return readFile(file, 'utf-8')
 		.then((data): [string, string][] => parseCsv(data, { delimiter: ';' }).data)
 		.then(data => data.forEach(row => {
 			translations.set(row[0], row[1])
