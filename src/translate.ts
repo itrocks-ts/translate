@@ -74,7 +74,7 @@ export async function trLoad(file: string)
 		.then(data => data.forEach(row => {
 			translations.set(row[0], row[1])
 			if (row[0].includes('$')) {
-				expressions.add(new RegExp('^' + row[0].replace(/(\$[0-9]+)/, '(.*)') + '$'))
+				expressions.add(RegExp('^' + row[0].replace(/(\$[0-9]+)/, '(.*)') + '$'))
 			}
 		}))
 }
