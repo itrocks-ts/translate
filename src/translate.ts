@@ -25,10 +25,7 @@ export function tr(text: string, options: Options): string
 export function tr(text: string, parts?: string[], options?: Options): string
 export function tr(text: string, parts?: string[] | Options, options?: Options): string
 {
-	if (!parts) {
-		parts = []
-	}
-	else if (parts && !Array.isArray(parts)) {
+	if (!Array.isArray(parts)) {
 		options = parts
 		parts   = []
 	}
