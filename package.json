@@ -10,7 +10,7 @@
 	"devDependencies": {
 		"@types/node": "^22.10",
 		"@types/papaparse": "^5.3",
-		"typescript": "~5.6"
+		"typescript": "~5.8"
 	},
 	"engines": {
 		"node": ">=18"
@@ -50,5 +50,5 @@
 		"build:esm": "tsc -p tsconfig.esm.json && node esm/esm"
 	},
 	"types": "esm/translate.js",
-	"version": "0.0.8"
+	"version": "0.0.9"
 }
