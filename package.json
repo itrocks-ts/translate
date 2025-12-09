@@ -4,13 +4,13 @@
 		"email": "baptiste@pillot.fr"
 	},
 	"dependencies": {
-		"papaparse": "^5.4"
+		"papaparse": "^5.5"
 	},
 	"description": "Manage dynamic string translations with support for variables and composite patterns",
 	"devDependencies": {
-		"@types/node": "^22.10",
-		"@types/papaparse": "^5.3",
-		"typescript": "~5.8"
+		"@types/node": "^24.10",
+		"@types/papaparse": "^5.5",
+		"typescript": "~5.9"
 	},
 	"engines": {
 		"node": ">=18"
@@ -50,5 +50,5 @@
 		"build:esm": "tsc -p tsconfig.esm.json && node esm/esm"
 	},
 	"types": "esm/translate.js",
-	"version": "0.0.9"
+	"version": "0.0.10"
 }
