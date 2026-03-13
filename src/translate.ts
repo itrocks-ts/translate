@@ -39,7 +39,9 @@ export function tr(text: string, parts?: string[] | Options, options?: Options):
 		?? translations.get(text.toLocaleLowerCase())
 		?? trMatch(text, parts)
 	if (!translated) {
-		const separator = (text.length > 1) ? text.match(/[.?!;:,()]/)?.[0] : undefined
+			const separator = (text.length > 1)
+				? ['.', '?', '!', ';', ':', ',', '(', ')'].find(c => text.includes(c))
+				: undefined
 		if (separator) {
 			translated = text.split(separator).map(text => tr(text, parts)).join(tr(separator).replace(/ /g, '\u00A0'))
 			return firstSpaces + translated + lastSpaces
