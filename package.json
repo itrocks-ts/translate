@@ -10,21 +10,17 @@
 	"devDependencies": {
 		"@types/node": "^24.10",
 		"@types/papaparse": "^5.5",
-		"typescript": "~5.9"
+		"typescript": "^6.0"
 	},
 	"engines": {
-		"node": ">=18"
+		"node": ">=24"
 	},
-	"exports": {
-		"import": "./esm/translate.js",
-		"require": "./cjs/translate.js"
-	},
+	"exports": "./cjs/translate.js",
 	"files": [
 		"LICENSE",
 		"README.md",
-		"*/*.d.ts",
-		"*/*.js",
-		"!*/esm.*"
+		"cjs",
+		"!*.map"
 	],
 	"homepage": "https://it.rocks",
 	"keywords": [
@@ -46,10 +42,7 @@
 		"url": "git+https://github.com/itrocks-ts/translate.git"
 	},
 	"scripts": {
-		"build": "npm run build:cjs && npm run build:esm",
-		"build:cjs": "tsc -p tsconfig.cjs.json",
-		"build:esm": "tsc -p tsconfig.esm.json && node esm/esm"
+		"build": "tsc"
 	},
-	"types": "esm/translate.js",
-	"version": "0.2.0"
+	"version": "0.2.1"
 }
