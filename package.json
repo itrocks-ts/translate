@@ -10,7 +10,7 @@
 	"devDependencies": {
 		"@types/node": "^24.10",
 		"@types/papaparse": "^5.5",
-		"typescript": "^6.0"
+		"typescript": "^7.0"
 	},
 	"engines": {
 		"node": ">=24"
@@ -44,5 +44,5 @@
 	"scripts": {
 		"build": "tsc"
 	},
-	"version": "0.2.1"
+	"version": "0.2.2"
 }
