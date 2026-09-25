@@ -42,7 +42,8 @@
 		"url": "git+https://github.com/itrocks-ts/translate.git"
 	},
 	"scripts": {
-		"build": "tsc"
+		"build": "tsc",
+		"test": "npm run build && node --test test/*.test.js"
 	},
 	"version": "0.2.2"
 }

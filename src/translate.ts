@@ -1,7 +1,27 @@
-import { access }   from 'node:fs/promises'
-import { readFile } from 'node:fs/promises'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { access }            from 'node:fs/promises'
+import { readFile }          from 'node:fs/promises'
 
 const parseCsv = require('papaparse').parse
+
+type Catalog = {
+	expressions:  Set<RegExp>
+	translations: Map<string, string>
+}
+
+type Expression = {
+	indexes: number[]
+	source:  string
+}
+
+export type LoadOptions = {
+	language?: string
+	reverse?:  boolean
+}
+
+export type Options = {
+	ucFirst?: boolean
+}
 
 export const DefaultOptions: Options = {
 	ucFirst: true
@@ -10,15 +30,27 @@ export const DefaultOptions: Options = {
 export const expressions  = new Set<RegExp>
 export const translations = new Map<string, string>
 
-let language = 'en-US'
+const catalogs       = new Map<string, Catalog>
+const expressionData = new WeakMap<RegExp, Expression>
+const languageScope  = new AsyncLocalStorage<string>()
+
+let defaultLanguage = 'en-US'
+
+catalogs.set(defaultLanguage, { expressions, translations })
+
+function catalog(language = lang()): Catalog
+{
+	let value = catalogs.get(language)
+	if (!value) {
+		value = { expressions: new Set, translations: new Map }
+		catalogs.set(language, value)
+	}
+	return value
+}
 
 export function lang()
 {
-	return language
-}
-
-export type Options = {
-	ucFirst?: boolean
+	return languageScope.getStore() ?? defaultLanguage
 }
 
 export function tr(text: string, options: Options): string
@@ -34,10 +66,11 @@ export function tr(text: string, parts?: string[] | Options, options?: Options):
 	let   partsCount = parts.length
 	const firstChar  = text[0]
 	const ucFirst    = (options?.ucFirst ?? DefaultOptions.ucFirst) && (firstChar >= 'A') && (firstChar <= 'Z')
-	let   translated = translations.get(text)
-		?? (ucFirst ? translations.get(firstChar.toLocaleLowerCase() + text.slice(1)) : undefined)
-		?? translations.get(text.toLocaleLowerCase())
-		?? trMatch(text, parts)
+	const active     = catalog()
+	let   translated = active.translations.get(text)
+		?? (ucFirst ? active.translations.get(firstChar.toLocaleLowerCase() + text.slice(1)) : undefined)
+		?? active.translations.get(text.toLocaleLowerCase())
+		?? trMatch(text, parts, active)
 	if (!translated) {
 			const separator = (text.length > 1)
 				? ['.', '?', '!', ';', ':', ',', '(', ')'].find(c => text.includes(c))
@@ -57,41 +90,75 @@ export function tr(text: string, parts?: string[] | Options, options?: Options):
 	return firstSpaces + translated + lastSpaces
 }
 
-export function trInit(lang: string)
+export function trInit(language: string)
 {
-	language = lang
+	defaultLanguage = language
+	catalogs.clear()
 	expressions.clear()
 	translations.clear()
+	catalogs.set(language, { expressions, translations })
 }
 
-export async function trLoad(file: string)
+export async function trLoad(file: string, options: LoadOptions = {})
 {
 	try { await access(file) }
 	catch { return }
+	const active = catalog(options.language ?? defaultLanguage)
 	return readFile(file, 'utf-8')
 		.then((data): [string, string][] => parseCsv(data, { delimiter: ';' }).data)
 		.then(data => data.forEach(row => {
-			translations.set(row[0], row[1])
-			if (row[0].includes('$')) {
-				expressions.add(RegExp('^' + row[0].replace(/(\$[0-9]+)/, '(.*)') + '$'))
+			const [source, target] = options.reverse ? [row[1], row[0]] : row
+			if ((typeof source !== 'string') || (typeof target !== 'string')) return
+			active.translations.set(source, target)
+			if (source.includes('$')) {
+				const indexes = []
+				let   last     = 0
+				let   pattern  = '^'
+				for (const match of source.matchAll(/\$([1-9][0-9]*)/g)) {
+					pattern += escapeRegExp(source.slice(last, match.index)) + '(.*?)'
+					indexes.push(Number(match[1]))
+					last = match.index + match[0].length
+				}
+				pattern += escapeRegExp(source.slice(last)) + '$'
+				const expression = RegExp(pattern)
+				expressionData.set(expression, { indexes, source })
+				active.expressions.add(expression)
 			}
 		}))
 }
 
-function trMatch(text: string, parts: string[]): string | undefined
+export function trWithLanguage<T>(language: string, callback: () => T): T
 {
-	for (const expression of expressions) {
+	return languageScope.run(language, callback)
+}
+
+function trMatch(text: string, parts: string[], active: Catalog): string | undefined
+{
+	for (const expression of active.expressions) {
 		const match = text.match(expression)
 		if (!match) continue
-		let   counter      = parts.length
-		const replacements = []
-		const trParts      = [...parts]
-		for (const part of match.slice(1)) {
+		const data = expressionData.get(expression)
+		let counter = 0
+		const source = data?.source
+			?? expression.source.slice(1, -1).replace(/\(\.\*\??\)/g, () => '$' + ++ counter)
+		const translated = active.translations.get(source)
+		if (!translated) continue
+		const trParts = [...parts]
+		for (const [offset, part] of match.slice(1).entries()) {
 			const translatedPart = tr(part)
-			trParts.push(translatedPart[0].toLocaleLowerCase() + translatedPart.slice(1))
-			replacements.push('$' + trParts.length)
+			trParts[data?.indexes[offset] ?? (offset + 1)] = (translatedPart && (translatedPart !== part))
+				? translatedPart[0].toLocaleLowerCase() + translatedPart.slice(1)
+				: translatedPart
 		}
-		const trText = expression.source.slice(1, -1).replaceAll('(.*)', () => '$' + ++counter)
-		return tr(trText, trParts)
+		let result = translated
+		for (let index = trParts.length - 1; index > 0; index--) {
+			result = result.replaceAll('$' + index, trParts[index] ?? '')
+		}
+		return result
 	}
+}
+
+function escapeRegExp(text: string)
+{
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

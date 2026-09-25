@@ -29,6 +29,7 @@ You typically use it to:
 
 - declare the current UI language with `trInit()`,
 - load translation keys from a CSV file with `trLoad()`,
+- isolate concurrent request languages with `trWithLanguage()`,
 - translate strings at runtime with `tr()`,
 - optionally inspect or extend the in-memory `translations` map.
 
@@ -102,6 +103,24 @@ async function initTranslations() {
 
 initTranslations().catch(console.error)
 ```
+
+### Concurrent request languages
+
+Load each catalog once, then run request work in its own asynchronous language context.
+The context is preserved through promises without changing other concurrent requests:
+
+```ts
+trInit('en-US')
+await trLoad('locales/fr-FR.csv', { language: 'fr-FR' })
+
+await trWithLanguage('fr-FR', async () => {
+  console.log(tr('Hello')) // Bonjour
+})
+```
+
+`trLoad(file, { language, reverse: true })` loads the second CSV column as the
+source and the first as the target. This is useful while migrating templates that
+temporarily contain literals in both the source and target languages.
 
 > **Note**
 > This package is intentionally minimal: it does not manage locales, fallbacks,
@@ -240,7 +259,7 @@ active language and want to reload translation data.
 ### `trLoad()`
 
 ```ts
-async function trLoad(file: string): Promise<void | unknown>
+async function trLoad(file: string, options?: LoadOptions): Promise<void | unknown>
 ```
 
 Loads translations from a **semicolon‑separated CSV file** at the given path.
@@ -253,6 +272,9 @@ Behavior:
   delimiter.
 - Each row is expected to have at least two columns: `row[0]` is the source
   string, `row[1]` is the translated string. Extra columns are ignored.
+- `options.language` selects the catalog to populate; it defaults to the language
+  selected by `trInit()`.
+- `options.reverse` swaps the source and translated columns while loading.
 - For each row, the pair is stored in `translations`.
 - If `row[0]` contains a placeholder like `$1`, an expression `RegExp` is
   created and added to `expressions` to support dynamic matching in `tr()`.
@@ -264,6 +286,16 @@ hello;Hello
 "Hello, $1";"Hello, $1"
 "You have $1 new messages";"You have $1 new messages"
 ```
+
+### `trWithLanguage()`
+
+```ts
+function trWithLanguage<T>(language: string, callback: () => T): T
+```
+
+Runs `callback` in an asynchronous language context. `lang()` and `tr()` use that
+language for the callback and all asynchronous work it starts. Concurrent contexts
+remain isolated.
 
 ## Typical use cases
 
