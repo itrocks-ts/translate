@@ -48,6 +48,11 @@ function catalog(language = lang()): Catalog
 	return value
 }
 
+function escapeRegExp(text: string)
+{
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export function lang()
 {
 	return languageScope.getStore() ?? defaultLanguage
@@ -127,11 +132,6 @@ export async function trLoad(file: string, options: LoadOptions = {})
 		}))
 }
 
-export function trWithLanguage<T>(language: string, callback: () => T): T
-{
-	return languageScope.run(language, callback)
-}
-
 function trMatch(text: string, parts: string[], active: Catalog): string | undefined
 {
 	for (const expression of active.expressions) {
@@ -158,7 +158,7 @@ function trMatch(text: string, parts: string[], active: Catalog): string | undef
 	}
 }
 
-function escapeRegExp(text: string)
+export function trWithLanguage<T>(language: string, callback: () => T): T
 {
-	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	return languageScope.run(language, callback)
 }
