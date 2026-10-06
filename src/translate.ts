@@ -1,23 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { access }            from 'node:fs/promises'
-import { readFile }          from 'node:fs/promises'
-
-const parseCsv = require('papaparse').parse
-
-type Catalog = {
-	expressions:  Set<RegExp>
-	translations: Map<string, string>
-}
-
-type Expression = {
-	indexes: number[]
-	source:  string
-}
-
-export type LoadOptions = {
-	language?: string
-	reverse?:  boolean
-}
+import { catalog }           from './catalog'
+import { catalogClear }      from './catalog'
+import { catalogLoad }       from './catalog'
+import { Catalog }           from './catalog'
 
 export type Options = {
 	ucFirst?: boolean
@@ -27,26 +12,9 @@ export const DefaultOptions: Options = {
 	ucFirst: true
 }
 
-export const expressions  = new Set<RegExp>
-export const translations = new Map<string, string>
-
-const catalogs       = new Map<string, Catalog>
-const expressionData = new WeakMap<RegExp, Expression>
-const languageScope  = new AsyncLocalStorage<string>()
+const languageScope = new AsyncLocalStorage<string>()
 
 let defaultLanguage = 'en-US'
-
-catalogs.set(defaultLanguage, { expressions, translations })
-
-function catalog(language = lang()): Catalog
-{
-	let value = catalogs.get(language)
-	if (!value) {
-		value = { expressions: new Set, translations: new Map }
-		catalogs.set(language, value)
-	}
-	return value
-}
 
 function escapeRegExp(text: string)
 {
@@ -71,11 +39,12 @@ export function tr(text: string, parts?: string[] | Options, options?: Options):
 	let   partsCount = parts.length
 	const firstChar  = text[0]
 	const ucFirst    = (options?.ucFirst ?? DefaultOptions.ucFirst) && (firstChar >= 'A') && (firstChar <= 'Z')
-	const active     = catalog()
-	let   translated = active.translations.get(text)
-		?? (ucFirst ? active.translations.get(firstChar.toLocaleLowerCase() + text.slice(1)) : undefined)
-		?? active.translations.get(text.toLocaleLowerCase())
+	const active     = catalog(lang())
+	let   translated = active.get(text)
+		?? (ucFirst ? active.get(firstChar.toLocaleLowerCase() + text.slice(1)) : undefined)
+		?? active.get(text.toLocaleLowerCase())
 		?? trMatch(text, parts, active)
+		?? (ucFirst ? trMatch(firstChar.toLocaleLowerCase() + text.slice(1), parts, active) : undefined)
 	if (!translated) {
 			const separator = (text.length > 1)
 				? ['.', '?', '!', ';', ':', ',', '(', ')'].find(c => text.includes(c))
@@ -98,55 +67,34 @@ export function tr(text: string, parts?: string[] | Options, options?: Options):
 export function trInit(language: string)
 {
 	defaultLanguage = language
-	catalogs.clear()
-	expressions.clear()
-	translations.clear()
-	catalogs.set(language, { expressions, translations })
+	catalogClear(language)
 }
 
-export async function trLoad(file: string, options: LoadOptions = {})
+export function trLoad(file: string, language = defaultLanguage)
 {
-	try { await access(file) }
-	catch { return }
-	const active = catalog(options.language ?? defaultLanguage)
-	return readFile(file, 'utf-8')
-		.then((data): [string, string][] => parseCsv(data, { delimiter: ';' }).data)
-		.then(data => data.forEach(row => {
-			const [source, target] = options.reverse ? [row[1], row[0]] : row
-			if ((typeof source !== 'string') || (typeof target !== 'string')) return
-			active.translations.set(source, target)
-			if (source.includes('$')) {
-				const indexes = []
-				let   last     = 0
-				let   pattern  = '^'
-				for (const match of source.matchAll(/\$([1-9][0-9]*)/g)) {
-					pattern += escapeRegExp(source.slice(last, match.index)) + '(.*?)'
-					indexes.push(Number(match[1]))
-					last = match.index + match[0].length
-				}
-				pattern += escapeRegExp(source.slice(last)) + '$'
-				const expression = RegExp(pattern)
-				expressionData.set(expression, { indexes, source })
-				active.expressions.add(expression)
-			}
-		}))
+	return catalogLoad(file, language)
 }
 
 function trMatch(text: string, parts: string[], active: Catalog): string | undefined
 {
-	for (const expression of active.expressions) {
+	for (const [source, translated] of active) {
+		if (!source.includes('$')) continue
+		const indexes = []
+		let   last    = 0
+		let   pattern = '^'
+		for (const match of source.matchAll(/\$([1-9][0-9]*)/g)) {
+			pattern += escapeRegExp(source.slice(last, match.index)) + '(.*?)'
+			indexes.push(Number(match[1]))
+			last = match.index + match[0].length
+		}
+		pattern += escapeRegExp(source.slice(last)) + '$'
+		const expression = RegExp(pattern)
 		const match = text.match(expression)
 		if (!match) continue
-		const data = expressionData.get(expression)
-		let counter = 0
-		const source = data?.source
-			?? expression.source.slice(1, -1).replace(/\(\.\*\??\)/g, () => '$' + ++ counter)
-		const translated = active.translations.get(source)
-		if (!translated) continue
 		const trParts = [...parts]
 		for (const [offset, part] of match.slice(1).entries()) {
 			const translatedPart = tr(part)
-			trParts[data?.indexes[offset] ?? (offset + 1)] = (translatedPart && (translatedPart !== part))
+			trParts[indexes[offset] ?? (offset + 1)] = (translatedPart && (translatedPart !== part))
 				? translatedPart[0].toLocaleLowerCase() + translatedPart.slice(1)
 				: translatedPart
 		}
@@ -158,7 +106,20 @@ function trMatch(text: string, parts: string[], active: Catalog): string | undef
 	}
 }
 
+export function trReverse(text: string): string
+{
+	for (const [source, translated] of catalog(lang())) {
+		if (
+			(translated === text)
+			|| (translated === text[0].toLocaleLowerCase() + text.slice(1))
+		) return source
+	}
+	return text
+}
+
 export function trWithLanguage<T>(language: string, callback: () => T): T
 {
 	return languageScope.run(language, callback)
 }
+
+export { translations } from './catalog'
