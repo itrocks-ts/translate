@@ -34,26 +34,40 @@ export function tr(text: string, parts?: string[] | Options, options?: Options):
 		options = parts
 		parts   = []
 	}
-	const [firstSpaces, lastSpaces] = (text.match(/^(\s*).*(\s*)$/) ?? ['', '', '']).slice(1)
+	const [firstSpaces, lastSpaces] = (text.match(/^(\s*)[\s\S]*?(\s*)$/) ?? ['', '', '']).slice(1)
 	text = text.trim()
 	let   partsCount = parts.length
 	const firstChar  = text[0]
 	const ucFirst    = (options?.ucFirst ?? DefaultOptions.ucFirst) && (firstChar >= 'A') && (firstChar <= 'Z')
 	const active     = catalog(lang())
+	const sentences  = /[.?!]$|\.(?=\s)/.test(text)
 	let   translated = active.get(text)
 		?? (ucFirst ? active.get(firstChar.toLocaleLowerCase() + text.slice(1)) : undefined)
 		?? active.get(text.toLocaleLowerCase())
-		?? trMatch(text, parts, active)
-		?? (ucFirst ? trMatch(firstChar.toLocaleLowerCase() + text.slice(1), parts, active) : undefined)
+		?? (!sentences ? trMatch(text, parts, active) : undefined)
 	if (!translated) {
-			const separator = (text.length > 1)
-				? ['.', '?', '!', ';', ':', ',', '(', ')'].find(c => text.includes(c))
-				: undefined
+		// Resolve the whole fragment before splitting punctuation inside it (brands, versions).
+		const ending = text.length > 1 ? text.match(/[.?!]$/) : null
+		if (ending) {
+			return firstSpaces + tr(text.slice(0, -1), parts, options) + tr(ending[0]).replace(/ /g, '\u00A0') + lastSpaces
+		}
+		if (/\$[1-9][0-9]*/.test(text) && !/\.(?=\s)/.test(text)) {
+			translated = text.split(/(\$[1-9][0-9]*)/).map(fragment => (
+				/^\$[1-9][0-9]*$/.test(fragment) ? fragment : tr(fragment, [], options)
+			)).join('')
+		}
+		const separator = !translated && (text.length > 1)
+			? ['.', '?', '!', ';', ':', ',', '(', ')'].find(c => (
+				c === '.' ? /\.(?=\s)/.test(text) : text.includes(c)
+			))
+			: undefined
 		if (separator) {
-			translated = text.split(separator).map(text => tr(text, parts)).join(tr(separator).replace(/ /g, '\u00A0'))
+			const fragments = text.split(separator === '.' ? /\.(?=\s)/ : separator)
+			translated = fragments.map(text => tr(text, parts, options))
+				.join(tr(separator).replace(/ /g, '\u00A0'))
 			return firstSpaces + translated + lastSpaces
 		}
-		translated = text
+		translated ??= text
 	}
 	while (partsCount) {
 		translated = translated.replaceAll('$' + partsCount, parts[--partsCount])
@@ -77,8 +91,10 @@ export function trLoad(file: string, language = defaultLanguage)
 
 function trMatch(text: string, parts: string[], active: Catalog): string | undefined
 {
-	for (const [source, translated] of active) {
-		if (!source.includes('$')) continue
+	// Prefer the most specific pattern over catch-all fragments such as "add $1".
+	for (const [source, translated] of [...active].filter(([source]) => source.includes('$')).sort(([left], [right]) => (
+		right.replace(/\$[1-9][0-9]*/g, '').length - left.replace(/\$[1-9][0-9]*/g, '').length
+	))) {
 		const indexes = []
 		let   last    = 0
 		let   pattern = '^'
@@ -88,7 +104,7 @@ function trMatch(text: string, parts: string[], active: Catalog): string | undef
 			last = match.index + match[0].length
 		}
 		pattern += escapeRegExp(source.slice(last)) + '$'
-		const expression = RegExp(pattern)
+		const expression = RegExp(pattern, 'i')
 		const match = text.match(expression)
 		if (!match) continue
 		const trParts = [...parts]
